@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cash Inventory Manager</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <span class="logo">💰</span>
+            <h1>Cash Inventory Manager</h1>
+        </div>
+        <div class="topbar-right">
+            <div class="user-avatar" id="userAvatar">?</div>
+            <div class="clock" id="clock">00:00:00</div>
+        </div>
+    </header>
+
+    <main class="main-container">
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-label">TOTAL IN</div>
+                <div class="card-value value-green" id="summaryTotalIn">₹0</div>
+            </div>
+            <div class="card">
+                <div class="card-label">TOTAL OUT</div>
+                <div class="card-value value-red" id="summaryTotalOut">₹0</div>
+            </div>
+            <div class="card">
+                <div class="card-label">NET MOVEMENT</div>
+                <div class="card-value value-navy" id="summaryTotalNet">₹0</div>
+            </div>
+        </div>
+
+
+        <!-- Single Page App View - Denomination Table -->
+        <div class="table-container">
+            <table class="data-table input-table">
+                <thead>
+                    <tr>
+                        <th class="text-left">DENOMINATION</th>
+                        <th class="text-center">AVAILABLE</th>
+                        <th class="text-center">NOTES IN (+)</th>
+                        <th class="text-center">NOTES OUT (-)</th>
+                        <th class="text-center">FINAL STOCK</th>
+                        <th class="text-right">TOTAL VALUE</th>
+                    </tr>
+                </thead>
+                <tbody id="denomTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+                <tfoot id="denomTableFoot">
+                    <!-- Total Row -->
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="form-actions">
+            <button class="btn btn-navy" id="saveEntryBtn">SAVE ENTRY</button>
+            <button class="btn btn-light" id="clearFieldsBtn">CLEAR FIELDS</button>
+        </div>
+
+        <!-- Transaction History Header -->
+        <div class="section-title">
+            <h2>Transaction History</h2>
+        </div>
+
+        <!-- Transaction History Table -->
+        <div class="table-container">
+            <table class="data-table history-table">
+                <thead>
+                    <tr>
+                        <th class="text-left" style="width: 40px"></th>
+                        <th class="text-left">TIMESTAMP</th>
+                        <th class="text-left">TOTAL IN</th>
+                        <th class="text-left">TOTAL OUT</th>
+                        <th class="text-left">GRAND TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <tr>
+                        <td colspan="5" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal for Edits -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Edit Transaction</h3>
+                <button class="btn-icon" id="closeEditModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="editTxId">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>Denomination</label>
+                        <input type="text" id="editDenomLabel" readonly
+                            style="background:#eee; border:1px solid #ccc; padding:8px; width:100%; box-sizing:border-box;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>Notes In</label>
+                        <input type="number" id="editNotesIn" min="0"
+                            style="padding:8px; width:100%; box-sizing:border-box; border:1px solid #ccc; text-align: right;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>Notes Out</label>
+                        <input type="number" id="editNotesOut" min="0"
+                            style="padding:8px; width:100%; box-sizing:border-box; border:1px solid #ccc; text-align: right;">
+                    </div>
+                    <div class="modal-actions"
+                        style="margin-top: 20px; display:flex; justify-content:flex-end; gap:8px;">
+                        <button type="button" class="btn btn-light" id="cancelEditBtn">Cancel</button>
+                        <button type="submit" class="btn btn-blue">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="supabase.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+
+</html>

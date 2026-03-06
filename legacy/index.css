@@ -1,0 +1,481 @@
+/* ============================================================
+   Cash Inventory Manager — Light Theme (Match Screenshot)
+   Font: Inter (Google Fonts)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --blue-header: #2b50bd;
+  --blue-btn: #1a3673;
+  --blue-light-btn: #2b50bd;
+  --red-btn: #d32f2f;
+  --green-text: #1b9948;
+  --red-text: #d32f2f;
+  --navy-text: #1a3673;
+
+  --bg-page: #f0f2f5;
+  --bg-card: #ffffff;
+  --bg-banner: #f8fbff;
+  --banner-border: #e4ebf5;
+
+  --border-light: #e0e0e0;
+
+  --text-primary: #333333;
+  --text-secondary: #5f6368;
+  --text-muted: #888888;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  --font-main: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-card);
+  /* White everywhere as seen in screenshot */
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+/* ── Topbar ────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--blue-header);
+  color: white;
+  padding: 12px 24px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  font-size: 1.5rem;
+}
+
+.topbar h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-avatar {
+  background-color: rgba(255, 255, 255, 0.2);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.clock {
+  font-family: 'Inter', monospace;
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+
+/* ── Main Container ────────────────────────────────────── */
+.main-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ── Summary Cards ────────────────────────────────────── */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin-bottom: 24px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+}
+
+.card {
+  padding: 16px 20px;
+  text-align: center;
+  background-color: var(--bg-card);
+  border-right: 1px solid var(--border-light);
+}
+
+.card:last-child {
+  border-right: none;
+}
+
+.card-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.card-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.value-green {
+  color: var(--green-text);
+}
+
+.value-red {
+  color: var(--red-text);
+}
+
+.value-navy {
+  color: var(--navy-text);
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-family: var(--font-main);
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn-navy {
+  background-color: var(--blue-btn);
+  color: white;
+}
+
+.btn-blue {
+  background-color: var(--blue-light-btn);
+  color: white;
+}
+
+.btn-red {
+  background-color: var(--red-btn);
+  color: white;
+}
+
+.btn-light {
+  background-color: #e4e7ec;
+  color: var(--text-primary);
+}
+
+.btn-danger {
+  background-color: var(--red-btn);
+  color: white;
+}
+
+.btn-ghost {
+  background-color: transparent;
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.btn-icon:hover {
+  background-color: #f0f0f0;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+}
+
+/* ── Tables ─────────────────────────────────────────── */
+.table-container {
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 12px 0px;
+  border-bottom: 2px solid var(--border-light);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 14px 0px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.data-table td.text-center,
+.data-table th.text-center {
+  text-align: center;
+}
+
+.data-table td.text-right,
+.data-table th.text-right {
+  text-align: right;
+}
+
+.data-table td.text-left,
+.data-table th.text-left {
+  text-align: left;
+}
+
+.data-table tbody tr:hover {
+  background-color: #fafbfc;
+}
+
+/* ── Row styles ─────────────────────────────────────── */
+.denom-value {
+  color: var(--blue-btn);
+  font-weight: 500;
+}
+
+.calc-text {
+  color: var(--green-text);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.total-value {
+  color: var(--green-text);
+  font-weight: 500;
+}
+
+/* Forms inside table */
+.input-table input[type="number"] {
+  width: 140px;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  text-align: right;
+}
+
+.input-table input[type="number"]:focus {
+  border-color: var(--blue-header);
+}
+
+.input-table tfoot td {
+  font-weight: 700;
+  background-color: #f7f9fc;
+  border-bottom: none;
+  border-top: 1px solid var(--border-light);
+  padding: 16px 0px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* ── History Table ───────────────────────────────────── */
+.section-title h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.history-table {
+  border-top: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.history-table th,
+.history-table tfoot td {
+  background-color: #f8fbff;
+}
+
+.history-table .expand-row td {
+  border-bottom: 1px solid var(--border-light);
+  background-color: #fafbfc;
+}
+
+.history-table .inner-table {
+  background-color: #fafbfc;
+  padding: 0 40px 16px 40px;
+}
+
+.inner-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inner-table th {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+  background-color: transparent;
+}
+
+.inner-table td {
+  font-size: 0.85rem;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.inner-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Utils */
+.amount-positive {
+  color: var(--green-text);
+}
+
+.amount-negative {
+  color: var(--red-text);
+}
+
+.text-navy {
+  color: var(--navy-text);
+  font-weight: 600;
+}
+
+/* Arrow toggle */
+.toggle-btn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.modal-overlay.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal {
+  background: white;
+  border-radius: var(--radius-md);
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h3 {
+  font-size: 1.1rem;
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  padding: 12px 20px;
+  background: white;
+  border-left: 4px solid var(--blue-header);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 0.85rem;
+  animation: slideIn 0.3s forwards;
+}
+
+.toast.success {
+  border-left-color: var(--green-text);
+}
+
+.toast.error {
+  border-left-color: var(--red-text);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

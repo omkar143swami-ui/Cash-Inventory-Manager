@@ -345,9 +345,7 @@ export default function Dashboard({ session }) {
                                 <th className="text-left">DENOMINATION</th>
                                 <th className="text-center">AVAILABLE</th>
                                 <th className="text-center">NOTES IN (+)</th>
-                                <th className="text-right">TOTAL IN (₹)</th>
                                 <th className="text-center">NOTES OUT (-)</th>
-                                <th className="text-right">TOTAL OUT (₹)</th>
                                 <th className="text-center">FINAL STOCK</th>
                                 <th className="text-right">TOTAL VALUE</th>
                             </tr>
@@ -376,32 +374,38 @@ export default function Dashboard({ session }) {
                                         <td className="text-left"><span className="denom-value">₹{d.value}</span></td>
                                         <td className="text-center">{fmt.count(d.available)}</td>
                                         <td className="text-center">
-                                            <input
-                                                type="number"
-                                                value={rowState.notes_in === 0 ? '' : rowState.notes_in}
-                                                min="0"
-                                                disabled={role === 'Auditor'}
-                                                onChange={(e) => handleDenomChange(d.id, 'notes_in', e.target.value)}
-                                            />
-                                        </td>
-                                        <td className="text-right">
-                                            <span className="amount-positive">
-                                                {rowState.notes_in > 0 ? `₹${d.value}*${rowState.notes_in}=${rowState.notes_in * d.value}` : '-'}
-                                            </span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                                <input
+                                                    type="number"
+                                                    value={rowState.notes_in === 0 ? '' : rowState.notes_in}
+                                                    min="0"
+                                                    disabled={role === 'Auditor'}
+                                                    onChange={(e) => handleDenomChange(d.id, 'notes_in', e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveEntry()}
+                                                />
+                                                {rowState.notes_in > 0 && (
+                                                    <span className="calc-text">
+                                                        ₹{d.value}*{rowState.notes_in}={rowState.notes_in * d.value}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="text-center">
-                                            <input
-                                                type="number"
-                                                value={rowState.notes_out === 0 ? '' : rowState.notes_out}
-                                                min="0"
-                                                disabled={role === 'Auditor'}
-                                                onChange={(e) => handleDenomChange(d.id, 'notes_out', e.target.value)}
-                                            />
-                                        </td>
-                                        <td className="text-right">
-                                            <span className="amount-negative">
-                                                {rowState.notes_out > 0 ? `₹${d.value}*${rowState.notes_out}=${rowState.notes_out * d.value}` : '-'}
-                                            </span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                                <input
+                                                    type="number"
+                                                    value={rowState.notes_out === 0 ? '' : rowState.notes_out}
+                                                    min="0"
+                                                    disabled={role === 'Auditor'}
+                                                    onChange={(e) => handleDenomChange(d.id, 'notes_out', e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveEntry()}
+                                                />
+                                                {rowState.notes_out > 0 && (
+                                                    <span className="calc-text-red">
+                                                        ₹{d.value}*{rowState.notes_out}={rowState.notes_out * d.value}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="text-center">
                                             <span className="calc-text">{netValueStr}</span>
@@ -414,10 +418,14 @@ export default function Dashboard({ session }) {
                         <tfoot>
                             <tr>
                                 <td className="text-left" colSpan="2">TOTAL</td>
-                                <td className="text-center">{fmt.count(uiTotalNotesIn)}</td>
-                                <td className="text-right amount-positive">{fmt.currency(uiTotalInValue)}</td>
-                                <td className="text-center">{fmt.count(uiTotalNotesOut)}</td>
-                                <td className="text-right amount-negative">{fmt.currency(uiTotalOutValue)}</td>
+                                <td className="text-center">
+                                    <div style={{ fontWeight: 'bold' }}>{fmt.count(uiTotalNotesIn)}</div>
+                                    <div className="amount-positive" style={{ fontSize: '0.8rem' }}>{fmt.currency(uiTotalInValue)}</div>
+                                </td>
+                                <td className="text-center">
+                                    <div style={{ fontWeight: 'bold' }}>{fmt.count(uiTotalNotesOut)}</div>
+                                    <div className="amount-negative" style={{ fontSize: '0.8rem' }}>{fmt.currency(uiTotalOutValue)}</div>
+                                </td>
                                 <td className="text-center"></td>
                                 <td className="text-right">{fmt.currency(uiTotalBalanceValue)}</td>
                             </tr>

@@ -282,7 +282,15 @@ body {
 .calc-text {
   color: var(--green-text);
   font-weight: 500;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  margin-top: 4px;
+}
+
+.calc-text-red {
+  color: var(--red-text);
+  font-weight: 500;
+  font-size: 0.82rem;
+  margin-top: 4px;
 }
 
 .total-value {

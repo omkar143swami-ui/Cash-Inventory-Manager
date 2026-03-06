@@ -325,30 +325,32 @@ export default function Dashboard({ session }) {
                 {/* Summary Cards */}
                 <div className="summary-cards">
                     <div className="card">
-                        <div className="card-label">TOTAL IN</div>
+                        <div className="card-label">TOTAL IN (+)</div>
                         <div className="card-value value-green" id="summaryTotalIn">
-                            {fmt.currency(totalInVal)}
+                            {fmt.currency(totalInVal + uiTotalInValue)}
                             {uiTotalInValue > 0 && (
-                                <div style={{ fontSize: '0.8rem', fontWeight: 500, marginTop: '4px', color: 'var(--text-secondary)' }}>
-                                    Current: {fmt.currency(uiTotalInValue)}
+                                <div style={{ fontSize: '0.75rem', fontWeight: 500, marginTop: '4px', opacity: 0.9 }}>
+                                    New: {fmt.currency(uiTotalInValue)} (N * NOTES IN)
                                 </div>
                             )}
                         </div>
                     </div>
                     <div className="card">
-                        <div className="card-label">TOTAL OUT</div>
+                        <div className="card-label">TOTAL OUT (-)</div>
                         <div className="card-value value-red" id="summaryTotalOut">
-                            {fmt.currency(totalOutVal)}
+                            {fmt.currency(totalOutVal + uiTotalOutValue)}
                             {uiTotalOutValue > 0 && (
-                                <div style={{ fontSize: '0.8rem', fontWeight: 500, marginTop: '4px', color: 'var(--text-secondary)' }}>
-                                    Current: {fmt.currency(uiTotalOutValue)}
+                                <div style={{ fontSize: '0.75rem', fontWeight: 500, marginTop: '4px', opacity: 0.9 }}>
+                                    New: {fmt.currency(uiTotalOutValue)} (N * NOTES OUT)
                                 </div>
                             )}
                         </div>
                     </div>
                     <div className="card">
                         <div className="card-label">NET MOVEMENT</div>
-                        <div className="card-value value-navy" id="summaryTotalNet">{fmt.currency(netBalance)}</div>
+                        <div className="card-value value-navy" id="summaryTotalNet">
+                            {fmt.currency((totalInVal + uiTotalInValue) - (totalOutVal + uiTotalOutValue))}
+                        </div>
                     </div>
                 </div>
 

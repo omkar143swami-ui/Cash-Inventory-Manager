@@ -327,29 +327,19 @@ export default function Dashboard({ session }) {
                     <div className="card">
                         <div className="card-label">TOTAL IN (+)</div>
                         <div className="card-value value-green" id="summaryTotalIn">
-                            {fmt.currency(totalInVal + uiTotalInValue)}
-                            {uiTotalInValue > 0 && (
-                                <div style={{ fontSize: '0.75rem', fontWeight: 500, marginTop: '4px', opacity: 0.9 }}>
-                                    New: {fmt.currency(uiTotalInValue)} (N * NOTES IN)
-                                </div>
-                            )}
+                            {fmt.currency(uiTotalInValue)}
                         </div>
                     </div>
                     <div className="card">
                         <div className="card-label">TOTAL OUT (-)</div>
                         <div className="card-value value-red" id="summaryTotalOut">
-                            {fmt.currency(totalOutVal + uiTotalOutValue)}
-                            {uiTotalOutValue > 0 && (
-                                <div style={{ fontSize: '0.75rem', fontWeight: 500, marginTop: '4px', opacity: 0.9 }}>
-                                    New: {fmt.currency(uiTotalOutValue)} (N * NOTES OUT)
-                                </div>
-                            )}
+                            {fmt.currency(uiTotalOutValue)}
                         </div>
                     </div>
                     <div className="card">
                         <div className="card-label">NET MOVEMENT</div>
                         <div className="card-value value-navy" id="summaryTotalNet">
-                            {fmt.currency((totalInVal + uiTotalInValue) - (totalOutVal + uiTotalOutValue))}
+                            {fmt.currency(uiTotalInValue - uiTotalOutValue)}
                         </div>
                     </div>
                 </div>

@@ -59,7 +59,7 @@ export default function Dashboard({ session }) {
 
     useEffect(() => {
         const timer = setInterval(() => {
-            setClock(new Date().toLocaleTimeString('en-US', { hour12: false }));
+            setClock(new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         }, 1000);
         return () => clearInterval(timer);
     }, []);
@@ -178,7 +178,8 @@ export default function Dashboard({ session }) {
         for (const [denomId, state] of Object.entries(currentState)) {
             if (state.notes_in > 0 || state.notes_out > 0) {
                 const denom = denominations.find(d => d.id === denomId);
-                if (state.notes_out > denom.available + state.notes_in) {
+                const userAvailable = userStockMap[denom.id] || 0;
+                if (state.notes_out > userAvailable + state.notes_in) {
                     showToast(`Insufficient stock for ₹${denom.value}.`, 'error');
                     return;
                 }
@@ -235,6 +236,7 @@ export default function Dashboard({ session }) {
 
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this transaction?')) return;
+        showToast('Deleting transaction...', 'info');
         const { error } = await supabase.from('transactions').delete().eq('id', id);
         if (error) {
             showToast('Delete failed: ' + error.message, 'error');
@@ -266,41 +268,93 @@ export default function Dashboard({ session }) {
     let uiTotalFinalStock = 0;
     let uiTotalBalanceValue = 0;
 
-    // History Grouping
-    const groups = [];
+    // History Grouping (By Session/Batch) with Running Balance calculation
+    // Note: transactions are ordered by created_at DESC (newest first)
+    const batches = [];
+
+    // To calculate running balances accurately for display, we'll first process 
+    // transactions in chronological order (ascending) starting from 0 (if we had the start)
+    // or simply display the batch's net effect if start balance isn't known.
+    // However, the screenshot shows a likely cumulative balance.
+    // We'll calculate a 'pseudo' running balance for the session.
+
     transactions.forEach(tx => {
         const tTime = new Date(tx.created_at).getTime();
-        let group = groups.find(g => Math.abs(g.time - tTime) < 5000 && g.user_id === tx.user_id && g.note === tx.note);
-        if (!group) {
-            group = { time: tTime, created_at: tx.created_at, items: [], user_id: tx.user_id, note: tx.note, totalIn: 0, totalOut: 0, isExpanded: false, id: `group-${tTime}` };
-            groups.push(group);
+        let batch = batches.find(g => Math.abs(g.time - tTime) < 5000 && g.user_id === tx.user_id && g.note === tx.note);
+        if (!batch) {
+            batch = {
+                time: tTime,
+                created_at: tx.created_at,
+                items: [],
+                user_id: tx.user_id,
+                note: tx.note,
+                totalIn: 0,
+                totalOut: 0,
+                id: `batch-${tTime}`,
+                runningTotal: 0
+            };
+            batches.push(batch);
         }
-        group.items.push(tx);
+        batch.items.push(tx);
         const val = tx.denominations?.value || 0;
-        group.totalIn += tx.notes_in * val;
-        group.totalOut += tx.notes_out * val;
+        batch.totalIn += tx.notes_in * val;
+        batch.totalOut += tx.notes_out * val;
     });
 
-    groups.reverse();
-    let currentGrandTotal = 0;
-    groups.forEach(g => {
-        currentGrandTotal += g.totalIn;
-        currentGrandTotal -= g.totalOut;
-        g.grandTotal = currentGrandTotal;
+    // Calculate Grand Totals (Running Balance)
+    // We'll approximate this by summing the net balances from oldest to newest
+    let currentRunning = 0;
+    [...batches].reverse().forEach(b => {
+        currentRunning += (b.totalIn - b.totalOut);
+        b.runningTotal = currentRunning;
     });
-    groups.reverse();
+
+    // Date-wise Grouping of Batches
+    const dateGroups = [];
+    batches.forEach(batch => {
+        const dateStr = new Date(batch.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+        let dateGroup = dateGroups.find(dg => dg.date === dateStr);
+        if (!dateGroup) {
+            dateGroup = { date: dateStr, batches: [], dayTotalIn: 0, dayTotalOut: 0 };
+            dateGroups.push(dateGroup);
+        }
+        dateGroup.batches.push(batch);
+        dateGroup.dayTotalIn += batch.totalIn;
+        dateGroup.dayTotalOut += batch.totalOut;
+    });
+
+    // Pre-calculate user stock from transactions (Multi-user isolation)
+    const userStockMap = {};
+    denominations.forEach(d => userStockMap[d.id] = 0);
+    transactions.forEach(tx => {
+        if (!userStockMap[tx.denomination_id]) userStockMap[tx.denomination_id] = 0;
+        userStockMap[tx.denomination_id] += (tx.notes_in - tx.notes_out);
+    });
 
     // History toggle state
-    const [expandedGroups, setExpandedGroups] = useState({});
+    const [expandedBatches, setExpandedBatches] = useState({});
     useEffect(() => {
-        if (groups.length > 0 && Object.keys(expandedGroups).length === 0) {
-            setExpandedGroups({ [groups[0].id]: true });
+        if (batches.length > 0 && Object.keys(expandedBatches).length === 0) {
+            setExpandedBatches({ [batches[0].id]: true });
         }
-    }, [groups, expandedGroups]);
+    }, [batches, expandedBatches]);
 
-    const toggleGroup = (id) => {
-        setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
+    const toggleBatch = (id) => {
+        setExpandedBatches(prev => ({ ...prev, [id]: !prev[id] }));
     };
+
+    // Pre-calculate session UI totals for summary cards
+    denominations.forEach(d => {
+        const rowState = formState[d.id] || { notes_in: 0, notes_out: 0 };
+        const userAvailable = userStockMap[d.id] || 0;
+        const finalStock = userAvailable + rowState.notes_in - rowState.notes_out;
+        uiTotalNotesIn += rowState.notes_in;
+        uiTotalInValue += rowState.notes_in * d.value;
+        uiTotalNotesOut += rowState.notes_out;
+        uiTotalOutValue += rowState.notes_out * d.value;
+        uiTotalFinalStock += finalStock;
+        uiTotalBalanceValue += (finalStock * d.value);
+    });
 
     if (loading) {
         return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>Loading dashboard...</div>;
@@ -310,146 +364,152 @@ export default function Dashboard({ session }) {
         <>
             <header className="topbar">
                 <div className="topbar-left">
-                    <span className="logo">💰</span>
-                    <h1>Cash Inventory Manager</h1>
+                    <span className="topbar-logo-icon">🗄️</span>
+                    <div className="topbar-title-wrap">
+                        <h1>Cash Inventory Manager</h1>
+                        <p>Track your cash denominations with precision</p>
+                    </div>
                 </div>
                 <div className="topbar-right">
-                    <div className="user-avatar" title={`${session.user.email} (${role})`} onClick={handleLogout}>
+                    <div className="clock-wrap">
+                        <div className="clock-time">{clock}</div>
+                        <div className="clock-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                    </div>
+                    <div className="user-avatar" title={`${session.user.email} (${role})`} onClick={handleLogout} style={{ cursor: 'pointer', border: '1px solid white' }}>
                         {fmt.initials(session.user.email)}
                     </div>
-                    <div className="clock">{clock}</div>
                 </div>
             </header>
 
             <main className="main-container">
                 {/* Summary Cards */}
                 <div className="summary-cards">
-                    <div className="card">
-                        <div className="card-label">TOTAL IN (+)</div>
-                        <div className="card-value value-green" id="summaryTotalIn">
-                            {fmt.currency(uiTotalInValue)}
+                    <div className="card green">
+                        <div className="card-info">
+                            <span className="card-label">Total In</span>
+                            <span className="card-value">{fmt.currency(uiTotalInValue)}</span>
                         </div>
+                        <span className="card-icon">↗️</span>
                     </div>
-                    <div className="card">
-                        <div className="card-label">TOTAL OUT (-)</div>
-                        <div className="card-value value-red" id="summaryTotalOut">
-                            {fmt.currency(uiTotalOutValue)}
+                    <div className="card red">
+                        <div className="card-info">
+                            <span className="card-label">Total Out</span>
+                            <span className="card-value">{fmt.currency(uiTotalOutValue)}</span>
                         </div>
+                        <span className="card-icon">↘️</span>
                     </div>
-                    <div className="card">
-                        <div className="card-label">NET MOVEMENT</div>
-                        <div className="card-value value-navy" id="summaryTotalNet">
-                            {fmt.currency(uiTotalInValue - uiTotalOutValue)}
+                    <div className="card blue">
+                        <div className="card-info">
+                            <span className="card-label">Net Movement</span>
+                            <span className="card-value">{uiTotalInValue >= uiTotalOutValue ? '+' : ''}{fmt.currency(uiTotalInValue - uiTotalOutValue)}</span>
                         </div>
+                        <span className="card-icon">📈</span>
                     </div>
                 </div>
 
-                {/* Form */}
-                <div className="table-container">
-                    <table className="data-table input-table">
+                {/* Main Table Interface */}
+                <div className="table-card">
+                    <table className="data-table">
                         <thead>
                             <tr>
-                                <th className="text-left" style={{ width: '80px' }}>N</th>
-                                <th className="text-center">AVAILABLE</th>
-                                <th className="text-center">NOTES IN (+)</th>
-                                <th className="text-center">NOTES OUT (-)</th>
-                                <th className="text-center">FINAL STOCK</th>
-                                <th className="text-right">TOTAL VALUE</th>
+                                <th>Denomination (₹)</th>
+                                <th>Available</th>
+                                <th style={{ color: 'var(--brand-green)' }}>Notes In (+)</th>
+                                <th style={{ color: 'var(--brand-red)' }}>Notes Out (-)</th>
+                                <th>Final Stock</th>
+                                <th>Total Value (₹)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {denominations.length === 0 && (
                                 <tr>
-                                    <td colSpan="6" className="text-center">No denominations configured.</td>
+                                    <td colSpan="6" className="text-center">No denominations found.</td>
                                 </tr>
                             )}
                             {denominations.map(d => {
                                 const rowState = formState[d.id] || { notes_in: 0, notes_out: 0 };
-                                const finalStock = d.available + rowState.notes_in - rowState.notes_out;
-                                const netChange = rowState.notes_in - rowState.notes_out;
+                                const userAvailable = userStockMap[d.id] || 0;
+                                const finalStock = userAvailable + rowState.notes_in - rowState.notes_out;
                                 const totalValue = finalStock * d.value;
-                                const netValueStr = netChange !== 0 ? ` ₹${d.value}*${netChange}=${d.value * netChange}` : '';
-
-                                uiTotalNotesIn += rowState.notes_in;
-                                uiTotalInValue += rowState.notes_in * d.value;
-                                uiTotalNotesOut += rowState.notes_out;
-                                uiTotalOutValue += rowState.notes_out * d.value;
-                                uiTotalFinalStock += finalStock;
-                                uiTotalBalanceValue += totalValue;
 
                                 return (
                                     <tr key={d.id}>
-                                        <td className="text-left"><span className="denom-value">₹{d.value}</span></td>
-                                        <td className="text-center">{fmt.count(d.available)}</td>
-                                        <td className="text-center" style={{ minWidth: '160px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                        <td>₹{d.value}</td>
+                                        <td>{fmt.count(userAvailable)}</td>
+                                        <td className="col-highlight-green notes-in">
+                                            <div className="input-cell">
                                                 <input
                                                     type="number"
-                                                    className="compact-input"
-                                                    value={rowState.notes_in === 0 ? '' : rowState.notes_in}
-                                                    min="0"
-                                                    disabled={role === 'Auditor'}
-                                                    placeholder="0"
+                                                    className="styled-input"
+                                                    value={rowState.notes_in || ''}
                                                     onChange={(e) => handleDenomChange(d.id, 'notes_in', e.target.value)}
                                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveEntry()}
-                                                    style={{ width: '100px', textAlign: 'right' }}
+                                                    placeholder="0"
                                                 />
-                                                {rowState.notes_in > 0 && (
-                                                    <span className="calc-text" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                                                        {d.value} * {rowState.notes_in} = {fmt.currency(rowState.notes_in * d.value)}
-                                                    </span>
-                                                )}
                                             </div>
                                         </td>
-                                        <td className="text-center" style={{ minWidth: '160px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                        <td className="col-highlight-red notes-out">
+                                            <div className="input-cell">
                                                 <input
                                                     type="number"
-                                                    className="compact-input"
-                                                    value={rowState.notes_out === 0 ? '' : rowState.notes_out}
-                                                    min="0"
-                                                    disabled={role === 'Auditor'}
-                                                    placeholder="0"
+                                                    className="styled-input"
+                                                    value={rowState.notes_out || ''}
                                                     onChange={(e) => handleDenomChange(d.id, 'notes_out', e.target.value)}
                                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveEntry()}
-                                                    style={{ width: '100px', textAlign: 'right' }}
+                                                    placeholder="0"
                                                 />
-                                                {rowState.notes_out > 0 && (
-                                                    <span className="calc-text-red" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                                                        {d.value} * {rowState.notes_out} = {fmt.currency(rowState.notes_out * d.value)}
-                                                    </span>
-                                                )}
                                             </div>
                                         </td>
-                                        <td className="text-center">
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                                <span style={{
-                                                    fontWeight: 600,
-                                                    color: rowState.notes_in > 0 ? 'var(--green-text)' : rowState.notes_out > 0 ? 'var(--red-text)' : 'inherit'
-                                                }}>
-                                                    {fmt.count(finalStock)}
-                                                </span>
-                                                <span className="calc-text" style={{ fontSize: '0.7rem', color: '#666' }}>{netValueStr}</span>
-                                            </div>
-                                        </td>
-                                        <td className="text-right"><span className="total-value">{fmt.currency(totalValue)}</span></td>
+                                        <td>{fmt.count(finalStock)}</td>
+                                        <td className="text-right">{fmt.currency(totalValue)}</td>
                                     </tr>
-                                )
+                                );
                             })}
                         </tbody>
                         <tfoot>
-                            <tr>
-                                <td className="text-left" colSpan="2">TOTAL</td>
-                                <td className="text-center">
-                                    <div style={{ fontWeight: 'bold' }}>{fmt.count(uiTotalNotesIn)}</div>
-                                    <div className="amount-positive" style={{ fontSize: '0.8rem' }}>{fmt.currency(uiTotalInValue)}</div>
+                            {/* Detailed Breakdown Rows per Screenshot */}
+                            <tr className="footer-row footer-row-green">
+                                <td className="footer-label" colSpan="2">Notes In (+)</td>
+                                <td className="footer-value" colSpan="4">
+                                    {denominations
+                                        .filter(d => formState[d.id]?.notes_in > 0)
+                                        .map(d => formState[d.id].notes_in)
+                                        .join(' + ') || '0'}
+                                    {uiTotalNotesIn > 0 && ` = ${uiTotalNotesIn}`}
                                 </td>
-                                <td className="text-center">
-                                    <div style={{ fontWeight: 'bold' }}>{fmt.count(uiTotalNotesOut)}</div>
-                                    <div className="amount-negative" style={{ fontSize: '0.8rem' }}>{fmt.currency(uiTotalOutValue)}</div>
+                            </tr>
+                            <tr className="footer-row footer-row-red" style={{ backgroundColor: '#fff5f4' }}>
+                                <td className="footer-label" colSpan="2" style={{ color: 'var(--brand-red)' }}>Notes Out (-)</td>
+                                <td className="footer-value" colSpan="4" style={{ color: 'var(--brand-red)' }}>
+                                    {denominations
+                                        .filter(d => formState[d.id]?.notes_out > 0)
+                                        .map(d => formState[d.id].notes_out)
+                                        .join(' + ') || '0'}
+                                    {uiTotalNotesOut > 0 && ` = ${uiTotalNotesOut}`}
                                 </td>
-                                <td className="text-center" style={{ fontWeight: 'bold' }}>{fmt.count(uiTotalFinalStock)}</td>
-                                <td className="text-right">{fmt.currency(uiTotalBalanceValue)}</td>
+                            </tr>
+                            <tr className="footer-row footer-row-blue">
+                                <td className="footer-label" colSpan="2">Final Stock</td>
+                                <td className="footer-value" colSpan="4">
+                                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                                        {denominations
+                                            .filter(d => (formState[d.id]?.notes_in > 0 || formState[d.id]?.notes_out > 0))
+                                            .map(d => {
+                                                const userAvailable = userStockMap[d.id] || 0;
+                                                const currentFinal = userAvailable + (formState[d.id]?.notes_in || 0) - (formState[d.id]?.notes_out || 0);
+                                                return (
+                                                    <span key={d.id}>
+                                                        ₹{d.value} × {currentFinal} = {fmt.currency(currentFinal * d.value)}
+                                                    </span>
+                                                );
+                                            })}
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr className="footer-row grand-total-row">
+                                <td className="footer-label" colSpan="2">Grand Total</td>
+                                <td colSpan="3"></td>
+                                <td className="text-right" style={{ fontSize: '1.2rem', color: 'var(--brand-blue)' }}>{fmt.currency(uiTotalBalanceValue)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -457,164 +517,215 @@ export default function Dashboard({ session }) {
 
                 {/* Action Buttons */}
                 <div className="form-actions">
-                    <button className="btn btn-navy" onClick={handleSaveEntry} disabled={saving}>
-                        {saving ? 'SAVING...' : 'SAVE ENTRY'}
+                    <button className="btn-large btn-primary" onClick={handleSaveEntry} disabled={saving}>
+                        {saving ? 'SAVING...' : 'Save & Update Stock'}
                     </button>
-                    <button className="btn btn-light" onClick={handleClearFields}>CLEAR FIELDS</button>
+                    <button className="btn-large btn-secondary" onClick={() => window.print()}>Print Report</button>
                 </div>
 
-                <div className="section-title">
-                    <h2>Transaction History</h2>
-                </div>
+                <div className="history-section" style={{ marginTop: '40px' }}>
+                    <h2 style={{ fontSize: '1.2rem', color: 'var(--brand-navy)', marginBottom: '20px' }}>Transaction History</h2>
+                    {dateGroups.map(dg => (
+                        <div key={dg.date} className="date-group" style={{ marginBottom: '30px' }}>
+                            <div className="date-group-header" style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '12px 20px',
+                                background: '#f8fafd',
+                                borderRadius: '8px 8px 0 0',
+                                borderBottom: '1px solid #e1e8f0'
+                            }}>
+                                <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--brand-navy)' }}>{dg.date}</h3>
+                                <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <span style={{ color: 'var(--brand-green)' }}>Total Day In: {fmt.currency(dg.dayTotalIn)}</span>
+                                    <span style={{ color: 'var(--brand-red)' }}>Total Day Out: {fmt.currency(dg.dayTotalOut)}</span>
+                                </div>
+                            </div>
 
-                <div className="table-container">
-                    <table className="data-table history-table">
-                        <thead>
-                            <tr>
-                                <th className="text-left" style={{ width: '40px' }}></th>
-                                <th className="text-left">TIMESTAMP</th>
-                                <th className="text-left">TOTAL IN</th>
-                                <th className="text-left">TOTAL OUT</th>
-                                <th className="text-left">GRAND TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {groups.length === 0 ? (
-                                <tr>
-                                    <td colSpan="5" className="text-center">No transactions available.</td>
-                                </tr>
-                            ) : groups.map(g => {
-                                const isExpanded = expandedGroups[g.id];
-
-                                return (
-                                    <React.Fragment key={g.id}>
+                            <div className="table-card" style={{ borderRadius: '0 0 8px 8px', boxShadow: 'none', border: '1px solid #e1e8f0', borderTop: 'none' }}>
+                                <table className="data-table history-table">
+                                    <thead style={{ background: '#f8fafd' }}>
                                         <tr>
-                                            <td className="text-center">
-                                                <button className="toggle-btn" onClick={() => toggleGroup(g.id)}>
-                                                    {isExpanded ? '▼' : '▲'}
-                                                </button>
-                                            </td>
-                                            <td>{fmt.datetime(g.created_at)}</td>
-                                            <td className="amount-positive">{fmt.currency(g.totalIn)}</td>
-                                            <td className="amount-negative">{fmt.currency(g.totalOut)}</td>
-                                            <td className="text-navy">{fmt.currency(g.grandTotal)}</td>
+                                            <th style={{ width: '40px' }}>Sr No</th>
+                                            <th style={{ width: '40px' }}></th>
+                                            <th className="text-left" style={{ fontSize: '0.75rem', color: '#666' }}>TIMESTAMP</th>
+                                            <th className="text-right" style={{ fontSize: '0.75rem', color: '#666' }}>TOTAL IN</th>
+                                            <th className="text-right" style={{ fontSize: '0.75rem', color: '#666' }}>TOTAL OUT</th>
+                                            <th className="text-right" style={{ fontSize: '0.75rem', color: '#666' }}>GRAND TOTAL</th>
                                         </tr>
-                                        {isExpanded && (
-                                            <tr className="expand-row">
-                                                <td colSpan="5" style={{ padding: 0 }}>
-                                                    <div className="inner-table">
-                                                        <table>
-                                                            <thead>
-                                                                <tr>
-                                                                    <th className="text-left">DENOMINATION</th>
-                                                                    <th className="text-left">NOTES IN</th>
-                                                                    <th className="text-left">IN AMOUNT</th>
-                                                                    <th className="text-left">NOTES OUT</th>
-                                                                    <th className="text-left">OUT AMOUNT</th>
-                                                                    <th className="text-right"></th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {g.items.map(tx => {
-                                                                    const val = tx.denominations?.value || 0;
-                                                                    const inAm = tx.notes_in > 0 ? `₹${val}*${tx.notes_in}=${tx.notes_in * val}` : '-';
-                                                                    const outAm = tx.notes_out > 0 ? `₹${val}*${tx.notes_out}=${tx.notes_out * val}` : '-';
-
-                                                                    return (
-                                                                        <tr key={tx.id}>
-                                                                            <td>₹{val}</td>
-                                                                            <td className="amount-positive">{fmt.count(tx.notes_in)}</td>
-                                                                            <td className="amount-positive">{inAm}</td>
-                                                                            <td className="amount-negative">{fmt.count(tx.notes_out)}</td>
-                                                                            <td className="amount-negative">{outAm}</td>
-                                                                            <td className="text-right">
-                                                                                {(role === 'Admin' || role === 'Cashier') && (
-                                                                                    <button
-                                                                                        className="btn-icon text-navy"
-                                                                                        onClick={() => {
-                                                                                            setEditModalTx(tx);
-                                                                                            setEditNotesIn(tx.notes_in);
-                                                                                            setEditNotesOut(tx.notes_out);
-                                                                                        }}
-                                                                                    >
-                                                                                        EDIT
-                                                                                    </button>
-                                                                                )}
-                                                                                {role === 'Admin' && (
-                                                                                    <button
-                                                                                        className="btn-icon"
-                                                                                        style={{ color: 'var(--red-text)' }}
-                                                                                        onClick={() => handleDelete(tx.id)}
-                                                                                    >
-                                                                                        DELETE
-                                                                                    </button>
-                                                                                )}
-                                                                            </td>
-                                                                        </tr>
-                                                                    )
-                                                                })}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+                                    </thead>
+                                    <tbody>
+                                        {dg.batches.map((batch, bIdx) => {
+                                            const isExpanded = expandedBatches[batch.id];
+                                            // Calculate global Sr No (overall index in 'batches' array)
+                                            const srNo = batches.findIndex(b => b.id === batch.id) + 1;
+                                            return (
+                                                <React.Fragment key={batch.id}>
+                                                    <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid #f0f0f0' }}>
+                                                        <td className="text-center" style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{srNo}</td>
+                                                        <td className="text-center">
+                                                            <button
+                                                                className="toggle-btn"
+                                                                onClick={() => toggleBatch(batch.id)}
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
+                                                            >
+                                                                {isExpanded ? '▼' : '▶'}
+                                                            </button>
+                                                        </td>
+                                                        <td className="text-left" style={{ fontSize: '0.9rem' }}>
+                                                            {new Date(batch.created_at).toLocaleString('en-IN', {
+                                                                day: 'numeric', month: 'numeric', year: 'numeric',
+                                                                hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
+                                                            })}
+                                                        </td>
+                                                        <td className="text-right" style={{ color: 'var(--brand-green)', fontWeight: 500 }}>{batch.totalIn > 0 ? fmt.currency(batch.totalIn) : '₹0'}</td>
+                                                        <td className="text-right" style={{ color: 'var(--brand-red)', fontWeight: 500 }}>{batch.totalOut > 0 ? fmt.currency(batch.totalOut) : '₹0'}</td>
+                                                        <td className="text-right" style={{ fontWeight: 'bold', color: '#000' }}>{fmt.currency(batch.runningTotal)}</td>
+                                                    </tr>
+                                                    {isExpanded && (
+                                                        <tr className="expand-row">
+                                                            <td colSpan="6" style={{ padding: '0 20px 20px 60px' }}>
+                                                                <div className="inner-table-wrap" style={{
+                                                                    background: '#fff',
+                                                                    border: '1px solid #e1e8f0',
+                                                                    borderRadius: '4px',
+                                                                    overflow: 'hidden'
+                                                                }}>
+                                                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                                        <thead style={{ background: '#f8fafd' }}>
+                                                                            <tr>
+                                                                                <th className="text-center" style={{ padding: '10px', fontSize: '0.7rem', color: '#666' }}>SR NO</th>
+                                                                                <th className="text-left" style={{ padding: '10px', fontSize: '0.7rem', color: '#666' }}>DENOMINATION</th>
+                                                                                <th className="text-center" style={{ padding: '10px', fontSize: '0.7rem', color: '#666' }}>NOTES IN</th>
+                                                                                <th className="text-center" style={{ padding: '10px', fontSize: '0.7rem', color: '#666' }}>IN AMOUNT</th>
+                                                                                <th className="text-center" style={{ padding: '10px', fontSize: '0.7rem', color: '#666' }}>NOTES OUT</th>
+                                                                                <th className="text-center" style={{ padding: '10px', fontSize: '0.7rem', color: '#666' }}>OUT AMOUNT</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {batch.items.map((tx, idx) => (
+                                                                                <React.Fragment key={tx.id}>
+                                                                                    <tr style={{ borderTop: '1px solid #f0f0f0' }}>
+                                                                                        <td className="text-center" style={{ padding: '12px 10px', fontSize: '0.8rem' }}>{idx + 1}</td>
+                                                                                        <td className="text-left" style={{ padding: '12px 10px', color: 'var(--brand-blue)', fontWeight: 500 }}>₹{tx.denominations?.value}</td>
+                                                                                        <td className="text-center" style={{ color: 'var(--brand-green)' }}>{tx.notes_in || '0'}</td>
+                                                                                        <td className="text-center" style={{ color: 'var(--brand-green)' }}>{tx.notes_in > 0 ? fmt.currency(tx.notes_in * tx.denominations.value) : '₹0'}</td>
+                                                                                        <td className="text-center" style={{ color: 'var(--brand-red)' }}>{tx.notes_out || '0'}</td>
+                                                                                        <td className="text-center" style={{ color: 'var(--brand-red)' }}>{tx.notes_out > 0 ? fmt.currency(tx.notes_out * tx.denominations.value) : '₹0'}</td>
+                                                                                    </tr>
+                                                                                    <tr>
+                                                                                        <td colSpan="6" style={{ padding: '10px', textAlign: 'left' }}>
+                                                                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                                                                <button
+                                                                                                    className="btn-txn-action edit"
+                                                                                                    onClick={() => {
+                                                                                                        showToast('Opening edit window...', 'info');
+                                                                                                        setEditModalTx(tx);
+                                                                                                        setEditNotesIn(tx.notes_in);
+                                                                                                        setEditNotesOut(tx.notes_out);
+                                                                                                    }}
+                                                                                                    style={{
+                                                                                                        background: 'var(--brand-blue)',
+                                                                                                        color: '#fff',
+                                                                                                        border: 'none',
+                                                                                                        padding: '5px 15px',
+                                                                                                        borderRadius: '4px',
+                                                                                                        cursor: 'pointer',
+                                                                                                        fontSize: '0.75rem',
+                                                                                                        fontWeight: 'bold'
+                                                                                                    }}
+                                                                                                >
+                                                                                                    EDIT
+                                                                                                </button>
+                                                                                                <button
+                                                                                                    className="btn-txn-action delete"
+                                                                                                    onClick={() => handleDelete(tx.id)}
+                                                                                                    style={{
+                                                                                                        background: 'var(--brand-red)',
+                                                                                                        color: '#fff',
+                                                                                                        border: 'none',
+                                                                                                        padding: '5px 15px',
+                                                                                                        borderRadius: '4px',
+                                                                                                        cursor: 'pointer',
+                                                                                                        fontSize: '0.75rem',
+                                                                                                        fontWeight: 'bold'
+                                                                                                    }}
+                                                                                                >
+                                                                                                    DELETE
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </React.Fragment>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            </main>
+            </main >
 
             {/* Edit Modal */}
-            {editModalTx && (
-                <div className="modal-overlay show">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h3>Edit Transaction</h3>
-                            <button className="btn-icon" onClick={() => setEditModalTx(null)}>✕</button>
-                        </div>
-                        <div className="modal-body">
-                            <form onSubmit={handleEditSaved}>
-                                <div className="form-group" style={{ marginBottom: '12px' }}>
-                                    <label>Denomination</label>
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        value={'₹' + (editModalTx?.denominations?.value || '0')}
-                                        style={{ background: '#eee', border: '1px solid #ccc', padding: '8px', width: '100%', boxSizing: 'border-box' }}
-                                    />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: '12px' }}>
-                                    <label>Notes In</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={editNotesIn}
-                                        onChange={e => setEditNotesIn(e.target.value)}
-                                        style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', textAlign: 'right' }}
-                                    />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: '12px' }}>
-                                    <label>Notes Out</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={editNotesOut}
-                                        onChange={e => setEditNotesOut(e.target.value)}
-                                        style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', textAlign: 'right' }}
-                                    />
-                                </div>
-                                <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                    <button type="button" className="btn btn-light" onClick={() => setEditModalTx(null)}>Cancel</button>
-                                    <button type="submit" className="btn btn-blue">Save Changes</button>
-                                </div>
-                            </form>
+            {
+                editModalTx && (
+                    <div className="modal-overlay show">
+                        <div className="modal">
+                            <div className="modal-header">
+                                <h3>Edit Transaction</h3>
+                                <button className="btn-icon" onClick={() => setEditModalTx(null)}>✕</button>
+                            </div>
+                            <div className="modal-body">
+                                <form onSubmit={handleEditSaved}>
+                                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                                        <label>Denomination</label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={'₹' + (editModalTx?.denominations?.value || '0')}
+                                            style={{ background: '#eee', border: '1px solid #ccc', padding: '8px', width: '100%', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                                        <label>Notes In</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={editNotesIn}
+                                            onChange={e => setEditNotesIn(e.target.value)}
+                                            style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', textAlign: 'right' }}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                                        <label>Notes Out</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={editNotesOut}
+                                            onChange={e => setEditNotesOut(e.target.value)}
+                                            style={{ padding: '8px', width: '100%', boxSizing: 'border-box', border: '1px solid #ccc', textAlign: 'right' }}
+                                        />
+                                    </div>
+                                    <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                        <button type="button" className="btn btn-light" onClick={() => setEditModalTx(null)}>Cancel</button>
+                                        <button type="submit" className="btn btn-blue">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             <ToastContainer toasts={toasts} />
         </>
